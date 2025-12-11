@@ -15,7 +15,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # โหลด token จาก environment (ต้องตั้งชื่อเป็น BOT_TOKEN บน Render)
-TOKEN = os.getenv("8324571927:AAHINhNwQZxb8e5VVzl2kEt-RbHUP_Bh610")
+TOKEN = os.getenv("BOT_TOKEN")
 if not TOKEN:
     logger.error("BOT_TOKEN environment variable not set!")
     raise SystemExit("BOT_TOKEN environment variable not set")
