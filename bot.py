@@ -1,6 +1,7 @@
 import pandas as pd
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+import os
 
 async def reply_cid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
@@ -8,7 +9,7 @@ async def reply_cid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # โหลดข้อมูลจาก Excel
     df = pd.read_excel("data.xlsx")
 
-    # ค้นหา
+    # ค้นหา CID
     row = df[df["CID"] == text]
 
     if row.empty:
@@ -34,7 +35,6 @@ async def reply_cid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(reply_msg)
     await update.message.reply_location(latitude=lat, longitude=lon)
 
-import os
 TOKEN = os.getenv("BOT_TOKEN")
 
 app = ApplicationBuilder().token(TOKEN).build()
