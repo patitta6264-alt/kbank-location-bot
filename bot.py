@@ -1,35 +1,42 @@
-import os
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import pandas as pd
+from telegram import Update
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
-TOKEN = os.getenv("BOT_TOKEN")
-df = pd.read_excel("data.xlsx")
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("สวัสดี! พิมพ์คำค้นเพื่อหาสาขาได้เลย")
-
-async def search_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def reply_cid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
-    if not text:
-        await update.message.reply_text("ใส่คำค้นก่อนค่ะ")
-        return
-    res = df[df.apply(lambda r: text.lower() in str(r.astype(str)).lower(), axis=1)]
-    if res.empty:
-        await update.message.reply_text("ไม่พบข้อมูล")
-        return
-    reply = ""
-    for _, row in res.iterrows():
-        reply += f"{row.get('branch','')} | {row.get('location','')}\n"
-    await update.message.reply_text(reply)
 
-def main():
-    if not TOKEN:
-        raise SystemExit("BOT_TOKEN environment variable not set")
-    app = ApplicationBuilder().token(TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, search_handler))
-    app.run_polling()
+    # โหลดข้อมูลจาก Excel
+    df = pd.read_excel("data.xlsx")
 
-if __name__ == "__main__":
-    main()
+    # ค้นหา
+    row = df[df["CID"] == text]
+
+    if row.empty:
+        await update.message.reply_text("ไม่พบข้อมูลค่ะ")
+        return
+
+    cid = row["CID"].values[0]
+    dest = row["Destination"].values[0]
+    lat = row["Lat"].values[0]
+    lon = row["Lon"].values[0]
+
+    maps_url = f"https://www.google.com/maps?q={lat},{lon}"
+
+    reply_msg = (
+        f"📌 ข้อมูลลูกค้า\n"
+        f"CID: {cid}\n"
+        f"ปลายทาง: {dest}\n"
+        f"Lat: {lat}\n"
+        f"Long: {lon}\n"
+        f"📍 เปิด Maps:\n{maps_url}"
+    )
+
+    await update.message.reply_text(reply_msg)
+    await update.message.reply_location(latitude=lat, longitude=lon)
+
+import os
+TOKEN = os.getenv("BOT_TOKEN")
+
+app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT, reply_cid))
+app.run_polling()
