@@ -6,10 +6,10 @@ import os
 async def reply_cid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
-    # โหลดข้อมูลจาก Excel
+    # โหลดไฟล์ Excel
     df = pd.read_excel("data.xlsx")
 
-    # ค้นหา CID
+    # หาแถวที่ CID ตรงกับข้อความที่ส่งมา
     row = df[df["CID"] == text]
 
     if row.empty:
@@ -24,19 +24,22 @@ async def reply_cid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     maps_url = f"https://www.google.com/maps?q={lat},{lon}"
 
     reply_msg = (
-        f"📌 ข้อมูลลูกค้า\n"
+        f"ข้อมูลที่พบค่ะ\n"
         f"CID: {cid}\n"
         f"ปลายทาง: {dest}\n"
         f"Lat: {lat}\n"
-        f"Long: {lon}\n"
-        f"📍 เปิด Maps:\n{maps_url}"
+        f"Lon: {lon}\n"
+        f"ดูแผนที่: {maps_url}"
     )
 
     await update.message.reply_text(reply_msg)
     await update.message.reply_location(latitude=lat, longitude=lon)
 
+
 TOKEN = os.getenv("BOT_TOKEN")
 
 app = ApplicationBuilder().token(TOKEN).build()
+
 app.add_handler(MessageHandler(filters.TEXT, reply_cid))
+
 app.run_polling()
