@@ -1,49 +1,37 @@
-import pandas as pd
-from telegram import Update
-from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
+from telegram.ext import ApplicationBuilder, MessageHandler, filters
 
-# โหลดข้อมูล
-df = pd.read_excel("data.xlsx")
+async def reply_cid(update, context):
+    text = update.message.text.strip()
 
-async def reply_cid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    cid = update.message.text.strip()
-
-    if not cid.isdigit():
-        await update.message.reply_text("❌ กรุณาพิมพ์เฉพาะตัวเลข CID")
+    # แยกข้อมูล
+    try:
+        cid, dest, lat, lon = text.split(",")
+    except:
+        await update.message.reply_text("❌ รูปแบบข้อมูลไม่ถูกต้อง\nตัวอย่าง: 1001,ATM,7.1234,100.5678")
         return
-
-    row = df[df["CID"] == int(cid)]
-
-    if row.empty:
-        await update.message.reply_text("❌ ไม่พบข้อมูลลูกค้า")
-        return
-
-    data = row.iloc[0]
-
-    dest = data["ปลายทาง"]
-    lat = data["Lat"]
-    lon = data["Long"]
 
     maps_url = f"https://www.google.com/maps?q={lat},{lon}"
 
     reply_msg = (
-        f"📍 ข้อมูลลูกค้า\n"
+        f"📌 ข้อมูลลูกค้า\n"
         f"CID: {cid}\n"
         f"ปลายทาง: {dest}\n"
         f"Lat: {lat}\n"
-        f"Long: {lon}\n\n"
-        f"📌 เปิด Maps: {maps_url}"
+        f"Long: {lon}\n"
+        f"➡️ เปิด Maps: {maps_url}"
     )
 
     await update.message.reply_text(reply_msg)
-    await update.message.reply_location(latitude=lat, longitude=lon)
+    await update.message.reply_location(latitude=float(lat), longitude=float(lon))
 
-# อ่าน TOKEN จาก environment variables
+
+# ------------------------
+# Main function
+# ------------------------
 import os
-TOKEN = os.environ.get("BOT_TOKEN")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
-app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT, reply_cid))
+app = ApplicationBuilder().token(BOT_TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_cid))
 
-if __name__ == "__main__":
-    app.run_polling()
+app.run_polling()
