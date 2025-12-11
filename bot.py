@@ -1,90 +1,58 @@
 import os
-import logging
 import pandas as pd
 from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters,
-)
+from telegram.ext import ApplicationBuilder, MessageHandler, ContextTypes, filters
 
-# ตั้ง logging เพื่อดู error ที่ชัดเจนใน log ของ Render
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# โหลดข้อมูลจากไฟล์ Excel (data.xlsx ต้องอยู่ใน repository)
+df = pd.read_excel("data.xlsx")
 
-# โหลด token จาก environment (ต้องตั้งชื่อเป็น BOT_TOKEN บน Render)
-TOKEN = os.getenv("BOT_TOKEN")
-if not TOKEN:
-    logger.error("BOT_TOKEN environment variable not set!")
-    raise SystemExit("BOT_TOKEN environment variable not set")
+async def reply_cid(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    cid = update.message.text.strip()
 
-# ชื่อไฟล์ Excel (ต้องอยู่ใน repo เดียวกับ bot.py หรือ path ถูกต้อง)
-DATA_FILE = "data.xlsx"
+    # ค้นหา row ตามคอลัมน์ "CID"
+    rows = df[df["CID"] == cid]
 
-# โหลด DataFrame ตอนเริ่ม ถ้าไฟล์หาไม่เจอจะออก error ให้เห็นใน log
-try:
-    df = pd.read_excel(DATA_FILE)
-    # ทำให้คอลัมน์ CID เป็น string เพื่อเทียบง่าย
-    df["CID"] = df["CID"].astype(str)
-    logger.info("Loaded data.xlsx with %d rows", len(df))
-except Exception as e:
-    logger.exception("Cannot load data file '%s': %s", DATA_FILE, e)
-    raise
+    if rows.empty:
+        await update.message.reply_text("❌ ไม่พบข้อมูล CID นี้ค่ะ")
+        return
 
-def find_cid(cid_value: str):
-    # เปรียบเทียบแบบไม่ sensitive ตัวพิมพ์-เล็ก (upper)
-    try:
-        matched = df[df["CID"].str.upper() == cid_value.strip().upper()]
-    except Exception as e:
-        logger.exception("Error searching CID: %s", e)
-        return None
+    row = rows.iloc[0]
 
-    if matched.empty:
-        return None
+    # ปรับชื่อคอลัมน์ตามไฟล์จริง (ตัวอย่าง: 'ปลายทาง', 'Lat', 'Long')
+    dest = row.get("ปลายทาง", "ไม่ระบุ")
+    # บางไฟล์ชื่อคอลัมน์อาจต่างกัน (เช่น 'lat' / 'LAT') — ตรวจสอบให้ตรง
+    lat = row.get("Lat") if "Lat" in row.index else row.get("lat") if "lat" in row.index else row.get("LAT")
+    lon = row.get("Long") if "Long" in row.index else row.get("long") if "long" in row.index else row.get("LONG")
 
-    row = matched.iloc[0]
+    # ถ้า lat/long เป็น NaN หรือ None ให้แจ้งกลับ
+    if pd.isna(lat) or pd.isna(lon):
+        await update.message.reply_text("❌ พิกัดไม่ถูกต้องในข้อมูล")
+        return
 
-    # เปลี่ยนชื่อตามคอลัมน์ใน Excel ของคุณ (เช่น 'Location','LAT','Long','Due Date')
-    location = row.get("Location", "")
-    due = row.get("Due Date", "")
-    lat = row.get("LAT", "")
-    long = row.get("Long", "")
+    maps_url = f"https://www.google.com/maps?q={lat},{lon}"
 
-    text = (
-        f"✅ พบข้อมูล\nCID: {cid_value}\n"
-        f"ปลายทาง: {location}\n"
-        f"Due Date: {due}\n"
-        f"LAT: {lat}\nLONG: {long}"
+    reply_msg = (
+        f"📍 ข้อมูลลูกค้า\n"
+        f"CID: {cid}\n"
+        f"ปลายทาง: {dest}\n"
+        f"Lat: {lat}\n"
+        f"Long: {lon}\n"
+        f"📌 เปิด Maps:\n{maps_url}"
     )
-    return text
 
-async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("สวัสดี! ส่ง CID มาให้หน่อย เช่น VPNKBG1911")
+    await update.message.reply_text(reply_msg)
+    # ส่ง location เป็นแผนที่ด้วย
+    await update.message.reply_location(latitude=float(lat), longitude=float(lon))
 
-async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("ส่งรหัส CID มาเพื่อค้นหาพิกัดจากไฟล์ Excel ค่ะ")
-
-async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    # ถ้าอยากให้รับคำสั่งแบบ / จะละไว้ — ที่นี่เป็นรับข้อความธรรมดา
-    logger.info("Received message: %s", text)
-    result = find_cid(text)
-    if result:
-        await update.message.reply_text(result)
-    else:
-        await update.message.reply_text("❌ ไม่พบข้อมูลสำหรับ CID นี้")
-
-def main():
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", start_cmd))
-    app.add_handler(CommandHandler("help", help_cmd))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_handler))
-
-    logger.info("Starting bot (polling)...")
-    app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    # อ่าน token จาก Environment Variable ชื่อ BOT_TOKEN
+    TOKEN = os.getenv("BOT_TOKEN")
+    if not TOKEN:
+        raise SystemExit("ERROR: BOT_TOKEN environment variable not set")
+
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, reply_cid))
+
+    # รันแบบ polling (เหมาะกับ Render)
+    app.run_polling()
