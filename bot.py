@@ -6,7 +6,7 @@ import os
 async def reply_cid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
-    # โหลดไฟล์ Excel
+    # โหลดไฟล์ Excel (ไฟล์ชื่อ data.xlsx อยู่ที่ root ของ repo)
     df = pd.read_excel("data.xlsx")
 
     # หาแถวที่ CID ตรงกับข้อความที่ส่งมา
@@ -36,10 +36,10 @@ async def reply_cid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_location(latitude=lat, longitude=lon)
 
 
-TOKEN = os.getenv("BOT_TOKEN")
+TOKEN = os.getenv("BOT_TOKEN")  # ตั้งค่า BOT_TOKEN ใน Render environment variables
 
 app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), reply_cid))
 
-app.add_handler(MessageHandler(filters.TEXT, reply_cid))
-
-app.run_polling()
+if __name__ == "__main__":
+    app.run_polling()
